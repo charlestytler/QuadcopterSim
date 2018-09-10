@@ -1,0 +1,133 @@
+<html>                                                                                                                  
+<head>
+                                                                                                              
+</head>                                                                                                                 
+<body>
+	<button id="play-restart" onclick="reset_starttime()">Restart</button>
+	<button id="toggle-camera-tracking" onclick="toggle_camera_tracking()">Toggle Camera Tracking Lock</button>
+	<button id="toggle-trajectory" onclick="toggle_trajectory_drawing()">Toggle Trajectory</button>
+	<br/>
+	<script src="https://rawgit.com/charlestytler/QuadcopterSim/master/visualizer/scripts/three.js"></script>   
+	<script src="https://rawgit.com/charlestytler/QuadcopterSim/master/visualizer/scripts/OrbitControls.js"></script>
+	<script src="https://rawgit.com/charlestytler/QuadcopterSim/master/visualizer/scripts/GridWorld.js"></script>
+	<script src="https://rawgit.com/charlestytler/QuadcopterSim/master/visualizer/nonlinear_sim_log.js"></script>
+	<script type="text/javascript" src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+    <script>
+	
+	// Load JSON Data
+	var t = sim_data[0];
+	var u = sim_data[1];
+	var x = sim_data[2];
+	
+	//var t = loadedData[0];
+	//var u = loadedData[1];
+	//var x = loadedData[2];
+	//console.log(x[2]);
+	
+	var scene = new THREE.Scene();
+	
+	var camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 20000 );
+	scene.add(camera);
+	camera.position.set(2,2,5);
+	
+	// Create grid world
+	init_grid_world(0.5, scene);
+	
+	// Create quadcopter object
+	var quadcopter = NewQuadcopter();
+	scene.add(quadcopter.base);
+	
+	//trajectory = NewTrajectoryPath(x[9], x[11], -x[10], 0x006600);
+	var line_path = new THREE.BufferGeometry();
+	var line_positions = new Float32Array( t.length * 3 );
+	line_path.addAttribute( 'position', new THREE.BufferAttribute( line_positions, 3) );
+	var ii=0;
+	for (var i=0; i < t.length; i++) {
+		line_positions[ii++] = x[9][i];
+		line_positions[ii++] = x[11][i];
+		line_positions[ii++] = -x[10][i];
+	}
+	var line = new THREE.Line( line_path, new THREE.LineBasicMaterial({color:0x003300}));
+	scene.add( line );
+	line_path.setDrawRange( 0, 0 );
+	
+	var renderer = new THREE.WebGLRenderer();
+	renderer.setSize( window.innerWidth / 1.5, window.innerHeight / 1.5);
+	document.body.appendChild( renderer.domElement );
+	
+	// CONTROLS
+	controls = new THREE.OrbitControls( camera, renderer.domElement );
+	controls.userPanSpeed = 0.1;
+	var camera_track_quadcopter = true;
+	
+	
+	var axesHelper = new THREE.AxesHelper( 5 );
+	//scene.add( axesHelper );
+	
+	
+	
+	function animate() {
+		requestAnimationFrame( animate );
+		update_objects();
+		update_controls();
+		renderer.render( scene, camera );
+	}
+	
+	function update_controls() {
+		if (camera_track_quadcopter) {
+			controls.center.set(quadcopter.base.position.x,
+				quadcopter.base.position.y, quadcopter.base.position.z);
+		}
+		controls.update();
+	}
+	
+	var clock = new THREE.Clock();
+	var playback_idx = 0;
+	var starttime;
+	
+	function reset_starttime() {
+		starttime = clock.getElapsedTime();
+		playback_idx = 0;
+	}
+	
+	function toggle_camera_tracking() {
+		camera_track_quadcopter = !camera_track_quadcopter;
+	}
+	
+	var trajectory_tracking = true;
+	function toggle_trajectory_drawing() {
+		trajectory_tracking = !trajectory_tracking;
+	}
+	
+	function update_objects() {
+		x_pos = x[9][playback_idx];
+		y_pos = x[10][playback_idx];
+		z_pos = x[11][playback_idx];
+		theta = x[7][playback_idx];
+		quadcopter.base.position.set( x_pos, z_pos, -y_pos );
+		quadcopter.base.rotation.z = theta;
+		
+		line_path.setDrawRange( 0, (trajectory_tracking ? playback_idx : 0) );
+		
+		// Rotate quadcopter propellers
+		quadcopter.propFL.rotation.y += 0.7;
+		quadcopter.propFR.rotation.y += 0.7;
+		quadcopter.propRL.rotation.y += 0.7;
+		quadcopter.propRR.rotation.y += 0.7;
+		// Advance frame with time 
+		//console.log(2 * (clock.getElapsedTime() - starttime), playback_idx, t.length, t[playback_idx])
+		if ( (clock.getElapsedTime() - starttime) >= t[playback_idx + 2] ) {
+			playback_idx += 2;
+		}
+		
+	}
+	
+	
+	clock.start();
+	reset_starttime();
+	animate();
+	
+    </script>   
+
+</body>                                                                                                                 
+</html> 
